@@ -2,8 +2,10 @@ package asia.scri.wifi_chicken;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.http.HttpResponse;
 //http通信
@@ -18,6 +20,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import android.os.Bundle;
+import android.os.DropBoxManager.Entry;
 import android.os.Handler;
 import android.app.Activity;
 import android.app.ListActivity;
@@ -41,6 +44,7 @@ public class MainActivity extends Activity implements APICallBack {
 
 	private Handler handler = new Handler();
 	private static final long UPDATE_INTERVAL = 1000;
+	public static final long CHECKOUT_THRESHHOLD = 10000;
 	private ListView lv;
 
 	@Override
@@ -144,7 +148,9 @@ public class MainActivity extends Activity implements APICallBack {
 		try {
 			venues = new JSONObject(
 					"{\"00:24:a5:31:29:18\":"
-					+ "{\"name\":\"Test Venue\"}}");
+					+ "{\"name\":\"Test Venue\"}," +
+					"\"6a:96:7b:2f:da:1b\":"
+					+ "{\"name\":\"iPhone mtanaka\"}}");
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
@@ -195,7 +201,7 @@ public class MainActivity extends Activity implements APICallBack {
 				for (int i = 0; i < results.size(); ++i) {
 					// 対象のSSIDがVenueとして登録されている場合
 					
-					items[i] = results.get(i).SSID + ":" + results.get(i).level;
+					items[i] = results.get(i).SSID + ":" +  results.get(i).BSSID + ":" +results.get(i).level;
 				}
 				ArrayAdapter<String> adapter = new ArrayAdapter<String>(
 						MainActivity.this, android.R.layout.simple_list_item_1,
@@ -215,6 +221,11 @@ public class MainActivity extends Activity implements APICallBack {
 			WifiManager manager = (WifiManager) getSystemService(WIFI_SERVICE);
 			if (manager.getWifiState() == WifiManager.WIFI_STATE_ENABLED) {
 				List<ScanResult> results = manager.getScanResults();
+				
+				
+
+				
+				//チェックイン処理
 				for (int i = 0; i < results.size(); ++i) {
 					String bssid = results.get(i).BSSID;
 					Log.d("bssid=",apStates.toString());
@@ -239,6 +250,38 @@ public class MainActivity extends Activity implements APICallBack {
 						Log.d("no venue : ",e.getMessage());
 					}
 
+				}
+				
+				
+				//チェックアウト処理
+				
+				
+				try {
+					for (java.util.Map.Entry<String, Long> e : apStates.entrySet()) {
+						// それぞれの要素の時刻の値が現在時刻より指定間隔を超えていた場合、チェックアウト
+						if (System.currentTimeMillis() - e.getValue().longValue() > MainActivity.CHECKOUT_THRESHHOLD){
+							// Checkout 処理
+							JSONObject venue;
+							try {
+								// key = BSSID
+								venue = venues.getJSONObject(e.getKey());
+								// チェックイン対象 (一回だけチェックイン）
+								Toast.makeText(MainActivity.this,
+										"Check Out at " + venue.get("name"), Toast.LENGTH_LONG)
+										.show();
+								// 削除
+								apStates.remove(e.getKey());
+							} catch (JSONException e1) {
+								// TODO Auto-generated catch block
+								e1.printStackTrace();
+							}
+							
+						}
+						
+					}
+				} catch (Exception e) {
+					//同時参照問題発生の場合は次に機会に
+					e.printStackTrace();
 				}
 			}
 		}
