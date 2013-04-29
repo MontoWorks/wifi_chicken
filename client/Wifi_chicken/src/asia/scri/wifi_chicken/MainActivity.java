@@ -13,6 +13,8 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import android.os.Bundle;
 import android.app.Activity;
@@ -21,13 +23,14 @@ import android.util.Log;
 import android.view.Menu;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
+import android.widget.Toast;
 import android.net.http.AndroidHttpClient;
 //wifiä÷òA
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements APICallBack  {
 	//private String[] mStrings =  new String[10];
 
 	@Override
@@ -49,6 +52,10 @@ public class MainActivity extends Activity {
         	lv.setAdapter(adapter);
         }
         
+        
+        GetVenuesAsyncTask getVenueAsyncTask = new GetVenuesAsyncTask(this);
+        getVenueAsyncTask.execute();
+        /*
         //httpí êM
         AndroidHttpClient httpClient = AndroidHttpClient.newInstance("User Agent");
         HttpGet request = new HttpGet("http://buskul.ap01.aws.af.cm/higashi.php");
@@ -140,6 +147,16 @@ public class MainActivity extends Activity {
 		// Inflate the menu; this adds items to the action bar if it is present.
 		getMenuInflater().inflate(R.menu.activity_main, menu);
 		return true;
+	}
+
+	@Override
+	public void onReceiveJSONObject(JSONObject jsonObject) {
+		try {
+			Toast.makeText(this,jsonObject.toString(2), Toast.LENGTH_LONG).show();
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 
 }
