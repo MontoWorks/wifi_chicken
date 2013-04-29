@@ -22,6 +22,7 @@ import org.json.JSONObject;
 import android.os.Bundle;
 import android.os.DropBoxManager.Entry;
 import android.os.Handler;
+import android.os.Vibrator;
 import android.app.Activity;
 import android.app.ListActivity;
 import android.util.Log;
@@ -29,6 +30,7 @@ import android.view.Menu;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.Toast;
+import android.media.MediaPlayer;
 import android.net.http.AndroidHttpClient;
 //wifi関連
 import android.net.wifi.ScanResult;
@@ -38,14 +40,16 @@ import android.net.wifi.WifiManager;
 public class MainActivity extends Activity implements APICallBack {
 	// private String[] mStrings = new String[10];
 
-	//ValueにはAPの最終確認時刻(UNIXタイム）
+	// ValueにはAPの最終確認時刻(UNIXタイム）
 	HashMap<String, Long> apStates;
 	JSONObject venues;
 
 	private Handler handler = new Handler();
 	private static final long UPDATE_INTERVAL = 1000;
-	public static final long CHECKOUT_THRESHHOLD = 10000;
+	public static final long CHECKOUT_THRESHHOLD = 60000;
 	private ListView lv;
+
+	private MediaPlayer checkInPlayer, checkOutPlayer;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -67,7 +71,6 @@ public class MainActivity extends Activity implements APICallBack {
 			lv.setAdapter(adapter);
 		}
 
-		
 		GetVenuesAsyncTask getVenueAsyncTask = new GetVenuesAsyncTask(this);
 		getVenueAsyncTask.execute();
 		/*
@@ -146,10 +149,8 @@ public class MainActivity extends Activity implements APICallBack {
 
 		// JSONObjectでVenueの情報を格納
 		try {
-			venues = new JSONObject(
-					"{\"00:24:a5:31:29:18\":"
-					+ "{\"name\":\"Test Venue\"}," +
-					"\"6a:96:7b:2f:da:1b\":"
+			venues = new JSONObject("{\"00:24:a5:31:29:18\":"
+					+ "{\"name\":\"Test Venue\"}," + "\"6a:96:7b:2f:da:1b\":"
 					+ "{\"name\":\"iPhone mtanaka\"}}");
 		} catch (JSONException e) {
 			e.printStackTrace();
@@ -161,7 +162,30 @@ public class MainActivity extends Activity implements APICallBack {
 			e.printStackTrace();
 		}
 
-		// 強制的に代入
+		checkInPlayer = MediaPlayer.create(MainActivity.this, R.raw.checkin);
+
+		try {
+			checkInPlayer.prepare();
+
+		} catch (IllegalStateException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		checkOutPlayer = MediaPlayer.create(MainActivity.this, R.raw.checkout);
+
+		try {
+			checkOutPlayer.prepare();
+
+		} catch (IllegalStateException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 
 	@Override
@@ -173,13 +197,11 @@ public class MainActivity extends Activity implements APICallBack {
 
 	@Override
 	public void onReceiveJSONObject(JSONObject jsonObject) {
-/*		try {
-		Toast.makeText(this, jsonObject.toString(2), Toast.LENGTH_LONG)
-				.show();
-		} catch (JSONException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}*/
+		/*
+		 * try { Toast.makeText(this, jsonObject.toString(2), Toast.LENGTH_LONG)
+		 * .show(); } catch (JSONException e) { // TODO Auto-generated catch
+		 * block e.printStackTrace(); }
+		 */
 	}
 
 	@Override
@@ -200,8 +222,9 @@ public class MainActivity extends Activity implements APICallBack {
 				String[] items = new String[results.size()];
 				for (int i = 0; i < results.size(); ++i) {
 					// 対象のSSIDがVenueとして登録されている場合
-					
-					items[i] = results.get(i).SSID + ":" +  results.get(i).BSSID + ":" +results.get(i).level;
+
+					items[i] = results.get(i).SSID + ":" + results.get(i).BSSID
+							+ ":" + results.get(i).level;
 				}
 				ArrayAdapter<String> adapter = new ArrayAdapter<String>(
 						MainActivity.this, android.R.layout.simple_list_item_1,
@@ -221,45 +244,48 @@ public class MainActivity extends Activity implements APICallBack {
 			WifiManager manager = (WifiManager) getSystemService(WIFI_SERVICE);
 			if (manager.getWifiState() == WifiManager.WIFI_STATE_ENABLED) {
 				List<ScanResult> results = manager.getScanResults();
-				
-				
 
-				
-				//チェックイン処理
+				// チェックイン処理
 				for (int i = 0; i < results.size(); ++i) {
 					String bssid = results.get(i).BSSID;
-					Log.d("bssid=",apStates.toString());
+					Log.d("bssid=", apStates.toString());
 					// 登録ベニューにヒットした場合、チェクインの可能性あり
 					try {
 						JSONObject venue = venues.getJSONObject(bssid);
 						// 存在する場合、apStatesを確認して、既にチェックインしていないか確認。
-						Log.d("appStates=",apStates.toString());
-						
+						Log.d("appStates=", apStates.toString());
+
 						if (apStates.get(bssid) == null) {
 							// チェックイン対象 (一回だけチェックイン）
 							Toast.makeText(MainActivity.this,
-									"Checkin at " + venue.get("name"), Toast.LENGTH_LONG)
-									.show();
-							
+									"Checkin at " + venue.get("name"),
+									Toast.LENGTH_LONG).show();
+
+							Vibrator vib = (Vibrator) getSystemService(VIBRATOR_SERVICE);
+							vib.vibrate(100);
+
+							checkInPlayer.start();
+
 						}
 						// いずれにせよ最終確認時刻を登録
-						apStates.put(bssid, Long.valueOf(System.currentTimeMillis()));
+						apStates.put(bssid,
+								Long.valueOf(System.currentTimeMillis()));
 
 					} catch (JSONException e) {
 						// 存在しない場合、対象外
-						Log.d("no venue : ",e.getMessage());
+						Log.d("no venue : ", e.getMessage());
 					}
 
 				}
-				
-				
-				//チェックアウト処理
-				
-				
+
+				// チェックアウト処理
+
 				try {
-					for (java.util.Map.Entry<String, Long> e : apStates.entrySet()) {
+					for (java.util.Map.Entry<String, Long> e : apStates
+							.entrySet()) {
 						// それぞれの要素の時刻の値が現在時刻より指定間隔を超えていた場合、チェックアウト
-						if (System.currentTimeMillis() - e.getValue().longValue() > MainActivity.CHECKOUT_THRESHHOLD){
+						if (System.currentTimeMillis()
+								- e.getValue().longValue() > MainActivity.CHECKOUT_THRESHHOLD) {
 							// Checkout 処理
 							JSONObject venue;
 							try {
@@ -267,20 +293,24 @@ public class MainActivity extends Activity implements APICallBack {
 								venue = venues.getJSONObject(e.getKey());
 								// チェックイン対象 (一回だけチェックイン）
 								Toast.makeText(MainActivity.this,
-										"Check Out at " + venue.get("name"), Toast.LENGTH_LONG)
-										.show();
+										"Check Out at " + venue.get("name"),
+										Toast.LENGTH_LONG).show();
 								// 削除
 								apStates.remove(e.getKey());
+								Vibrator vib = (Vibrator) getSystemService(VIBRATOR_SERVICE);
+								vib.vibrate(100);
+
+								checkOutPlayer.start();
 							} catch (JSONException e1) {
 								// TODO Auto-generated catch block
 								e1.printStackTrace();
 							}
-							
+
 						}
-						
+
 					}
 				} catch (Exception e) {
-					//同時参照問題発生の場合は次に機会に
+					// 同時参照問題発生の場合は次に機会に
 					e.printStackTrace();
 				}
 			}
