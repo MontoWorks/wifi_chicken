@@ -1,0 +1,4 @@
+・listViewとListActivity（１）-基礎編 - 愚鈍人 http://ichitcltk.hustle.ne.jp/gudon/modules/pico_rd/index.php?content_id=68
+
+・WiFiの情報を取得する « Tech Booster http://techbooster.jpn.org/andriod/device/1376/
+
